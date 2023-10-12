@@ -23,34 +23,44 @@ public class FilterTaskAuth extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        var authorization = request.getHeader("Authorization");
+        try {
+            var servletPath = request.getServletPath();
 
-        if (authorization != null && authorization.startsWith("Basic")) {
-            try {
-                var authEncoded = authorization.substring("Basic".length()).trim();
+            if ("/tasks/".equals(servletPath)) {
 
-                byte[] authDecode = Base64.getDecoder().decode(authEncoded);
+                var authorization = request.getHeader("Authorization");
 
-                var authString = new String(authDecode);
+                if (authorization != null && authorization.startsWith("Basic")) {
+                    var authEncoded = authorization.substring("Basic".length()).trim();
 
-                String[] credentials = authString.split(":");
+                    byte[] authDecode = Base64.getDecoder().decode(authEncoded);
 
-                String username = credentials[0];
-                String password = credentials[1];
+                    var authString = new String(authDecode);
 
-                var user = this.userRepository.findByUsername(username);
+                    String[] credentials = authString.split(":");
 
-                if (user != null) {
-                    if (BCrypt.verifyer().verify(password.toCharArray(), user.getPassword()).verified) {
-                        filterChain.doFilter(request, response);
-                        return;
+                    String username = credentials[0];
+                    String password = credentials[1];
+
+                    var user = this.userRepository.findByUsername(username);
+
+                    if (user != null) {
+                        var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+                        if (passwordVerify.verified) {
+                            filterChain.doFilter(request, response);
+                            return;
+                        }
                     }
                 }
-            } catch (Exception e) {
-                // Tratar exceções ao decodificar ou processar credenciais
-            }
-        }
 
-        response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Usuário não autorizado");
+
+            } else {
+                filterChain.doFilter(request, response);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro interno no servidor: " + e.getMessage());
+        }
     }
 }
