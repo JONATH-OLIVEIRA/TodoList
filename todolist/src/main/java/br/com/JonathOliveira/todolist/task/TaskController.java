@@ -1,8 +1,6 @@
 package br.com.JonathOliveira.todolist.task;
 
 import java.time.LocalDateTime;
-import java.util.UUID;
-
 import java.util.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -49,23 +47,31 @@ public class TaskController {
     }
 
     @GetMapping("/")
-    public List<TaskModel> List(HttpServletRequest request){
-
-        var idUser = request.getAttribute("idUser");  
-        var tasks = this.taskRepository.findByIdUser((UUID) idUser);
-
+    public List<TaskModel> List(HttpServletRequest request) {
+        var idUser = (UUID) request.getAttribute("idUser");
+        var tasks = this.taskRepository.findByIdUser(idUser);
         return tasks;
-
     }
-
+    
     @PutMapping("/{id}")
-    public TaskModel update(@RequestBody TaskModel taskModel,HttpServletRequest request,@PathVariable UUID id ){
-        
+    public ResponseEntity update(@RequestBody TaskModel taskModel, HttpServletRequest request, @PathVariable UUID id) {
+
         var task = this.taskRepository.findById(id).orElse(null);
+    
+        if (task == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Tarefa nao encontrada");
+        }
+    
+        var idUser = request.getAttribute("idUser");
+    
+        if (!task.getIdUser().equals(idUser)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Usuario nao tem permissao para alterar");
+        }
+    
         Utils.copyNonNullProperties(taskModel, task);
-
-        return this.taskRepository.save(task);
+        var taskUpdated = this.taskRepository.save(task);
+    
+        return ResponseEntity.ok().body(taskUpdated);
     }
-
     
 }
